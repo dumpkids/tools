@@ -17,13 +17,14 @@ fi
 
 if [ -n "$MISSING_PKGS" ]; then
     echo "[INFO] Script ini membutuhkan dependency yang belum terinstall: $MISSING_PKGS"
-    read -p "Apakah Anda ingin menginstall dependency tersebut sekarang? (y/n): " INSTALL_DEPS
+    # Memaksa read membaca dari terminal fisik (/dev/tty), bukan dari pipe curl
+    read -p "Apakah Anda ingin menginstall dependency tersebut sekarang? (y/n): " INSTALL_DEPS < /dev/tty
     
     if [[ "$INSTALL_DEPS" =~ ^[Yy]$ ]]; then
         # Instalasi membutuhkan akses root
         if [ "$EUID" -ne 0 ]; then
             echo "[ERROR] Proses instalasi membutuhkan akses root."
-            echo "Silakan jalankan ulang script ini dengan perintah: sudo $0"
+            echo "Silakan jalankan ulang script ini dengan perintah: curl -sSL <URL> | sudo bash"
             exit 1
         fi
         
@@ -56,13 +57,14 @@ fi
 # ==========================================
 # 2. Interaksi Tanya Jawab Proxy
 # ==========================================
-read -p "Apakah ingin cek via proxy? (y/n): " USE_PROXY
+# Memaksa input keyboard meskipun script dieksekusi dari pipe curl
+read -p "Apakah ingin cek via proxy? (y/n): " USE_PROXY < /dev/tty
 
 if [[ "$USE_PROXY" =~ ^[Yy]$ ]]; then
-    read -p "IP Proxy: " PROXY_IP
-    read -p "Port Proxy: " PROXY_PORT
-    read -p "Username (kosongkan jika tidak ada): " PROXY_USER
-    read -s -p "Password (kosongkan jika tidak ada): " PROXY_PASS
+    read -p "IP Proxy: " PROXY_IP < /dev/tty
+    read -p "Port Proxy: " PROXY_PORT < /dev/tty
+    read -p "Username (kosongkan jika tidak ada): " PROXY_USER < /dev/tty
+    read -s -p "Password (kosongkan jika tidak ada): " PROXY_PASS < /dev/tty
     echo "" # Memunculkan baris baru setelah mengetik password yang disembunyikan
     
     # Format argumen proxy untuk curl
