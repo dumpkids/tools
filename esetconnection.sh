@@ -1,12 +1,12 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker v2.5 - Proxy TCP Fixed
+# ESET Connectivity Checker v2.7 - Test Proxy ke ESET
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
 # Configuration
-readonly SCRIPT_VERSION="2.5"
+readonly SCRIPT_VERSION="2.7"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly TEMP_DIR=$(mktemp -d)
@@ -90,30 +90,27 @@ check_dependencies() {
 }
 
 #-------------------------------------------------------------------------------
-# 2. Proxy Validation Function
+# 2. Proxy Validation Function - Test ke ESET.com
 #-------------------------------------------------------------------------------
 test_proxy_connection() {
-    local test_url="http://httpbin.org/ip"
     local test_output
     local exit_code=0
     
-    log_info "Testing proxy connectivity..."
+    log_info "Testing koneksi proxy ke update.eset.com:80 ..."
     
-    # Test HTTP melalui proxy
-    test_output=$(curl -s -x "$http_proxy" --connect-timeout 5 --max-time 5 "$test_url" 2>&1) || exit_code=$?
+    # Test TCP tunnel ke update.eset.com:80 via proxy
+    test_output=$(curl -v -x "$http_proxy" \
+        --connect-timeout "$TIMEOUT" \
+        --max-time "$TIMEOUT" \
+        "telnet://update.eset.com:80" 2>&1) || exit_code=$?
     
-    if [[ $exit_code -eq 0 ]] && echo "$test_output" | grep -q "origin"; then
-        local detected_ip
-        detected_ip=$(echo "$test_output" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
-        echo "HTTP_OK:$detected_ip"
+    # Cek apakah tunnel berhasil dibuat
+    if echo "$test_output" | grep -q "CONNECT tunnel established\|200 Connection established"; then
+        echo "TCP_OK"
         return 0
     else
-        # Coba TCP test ke google:443 sebagai fallback
-        if curl -v -x "$http_proxy" --connect-timeout 5 "telnet://www.google.com:443" 2>&1 | grep -q "200 Connection established"; then
-            echo "TCP_OK"
-            return 0
-        fi
-        echo "Proxy test failed"
+        # Tampilkan error untuk debugging
+        echo "$test_output" | grep -E "(Could not connect|Failed to connect|403|407|502|503)" | tail -3
         return 1
     fi
 }
@@ -183,17 +180,10 @@ setup_proxy() {
         
         echo ""
         local test_result
-        local test_status=""
-        local detected_ip=""
         
         if test_result=$(test_proxy_connection); then
-            test_status="${test_result%%:*}"
-            detected_ip="${test_result##*:}"
-            
-            if [[ "$test_status" == "HTTP_OK" ]]; then
-                log_ok "Proxy aktif! (Detected IP: $detected_ip)"
-            else
-                log_ok "Proxy TCP tunnel aktif!"
+            if [[ "$test_result" == "TCP_OK" ]]; then
+                log_ok "Proxy aktif! Tunnel ke update.eset.com berhasil."
             fi
             USE_PROXY="y"
             return 0
@@ -277,13 +267,11 @@ check_target() {
         
         if [[ "${USE_PROXY:-}" == "y" ]]; then
             method="Proxy-TCP"
-            # Gunakan curl dengan telnet:// untuk TCP check via proxy (CONNECT method)
-            # Cek "200 Connection established" atau "CONNECT tunnel established"
             if curl -v -x "$http_proxy" \
                      --connect-timeout "$TIMEOUT" \
                      --max-time "$TIMEOUT" \
                      "telnet://$host:$port" 2>&1 | \
-                     grep -q "200 Connection established\|CONNECT tunnel established"; then
+                     grep -q "CONNECT tunnel established\|200 Connection established"; then
                 status="OK"
             fi
         else
@@ -297,7 +285,6 @@ check_target() {
         local method="Direct"
         [[ "${USE_PROXY:-}" == "y" ]] && method="Proxy"
         
-        # Curl otomatis gunakan http_proxy/https_proxy env var
         if curl -sf --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" "$address" &>/dev/null; then
             status="OK"
         fi
@@ -320,7 +307,7 @@ export USE_PROXY http_proxy https_proxy TIMEOUT TEMP_DIR
 
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (TCP Proxy)    "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (ESET Test)    "
     echo "=========================================================="
     echo ""
     
