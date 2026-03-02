@@ -6,7 +6,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 # Configuration
-readonly SCRIPT_VERSION="2.3"
+readonly SCRIPT_VERSION="2.2"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly PROXY_TEST_URL="http://httpbin.org/ip"
