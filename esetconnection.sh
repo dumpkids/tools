@@ -9,7 +9,8 @@ IFS=$'\n\t'
 readonly SCRIPT_VERSION="2.2"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
-readonly PROXY_TEST_URL="http://httpbin.org/ip"
+readonly PROXY_TEST_URL="https://eset.com/"
+# cek proxy http://httpbin.org/ip
 readonly TEMP_DIR=$(mktemp -d)
 readonly NETRC_FILE="$TEMP_DIR/.netrc"
 
