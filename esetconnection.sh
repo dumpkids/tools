@@ -310,7 +310,7 @@ main() {
     setup_proxy
 
     echo ""
-    log_info "Memulai pengecekan ke ${#TARGETS[@]} target..."
+    log_info "Memulai pengecekan ke ${#TARGETS[@]} target... [SOURCE : https://support.eset.com/en/kb332] "
     echo "----------------------------------------------------------"
 
     rm -rf "$TEMP_DIR"/result_* 2>/dev/null || true
