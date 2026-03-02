@@ -1,29 +1,24 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker - Fixed Pipe Mode with Proxy Support
+# ESET Connectivity Checker v2.2 - Proxy Argument Fix
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
-#-------------------------------------------------------------------------------
 # Configuration
-#-------------------------------------------------------------------------------
 readonly SCRIPT_VERSION="2.3"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
-readonly PROXY_TEST_URL="https://eset.com/"
-## bisa pake http://httpbin.org/ip
+readonly PROXY_TEST_URL="http://httpbin.org/ip"
 readonly TEMP_DIR=$(mktemp -d)
 readonly NETRC_FILE="$TEMP_DIR/.netrc"
 
 # Global State
 USE_PROXY="n"
-PROXY_ARGS=""
 PROXY_IP=""
 PROXY_PORT=""
 PROXY_USER=""
 
-# Cleanup on exit
 cleanup() {
     local exit_code=$?
     rm -rf "$TEMP_DIR" 2>/dev/null || true
@@ -34,17 +29,11 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-#-------------------------------------------------------------------------------
-# Logging Functions
-#-------------------------------------------------------------------------------
 log_info() { printf "\e[34m[INFO]\e[0m  %s\n" "$(date '+%H:%M:%S') - $*"; }
 log_ok()   { printf "\e[32m[OK]\e[0m    %s\n" "$(date '+%H:%M:%S') - $*"; }
 log_warn() { printf "\e[33m[WARN]\e[0m  %s\n" "$(date '+%H:%M:%S') - $*" >&2; }
 log_err()  { printf "\e[31m[ERROR]\e[0m %s\n" "$(date '+%H:%M:%S') - $*" >&2; }
 
-#-------------------------------------------------------------------------------
-# 1. Dependency Check
-#-------------------------------------------------------------------------------
 check_dependencies() {
     local missing=()
     
@@ -62,7 +51,6 @@ check_dependencies() {
     
     log_warn "Dependency belum terinstall: ${missing[*]}"
     
-    # Cek apakah bisa akses TTY untuk konfirmasi
     if [[ ! -r /dev/tty ]]; then
         log_err "Mode non-interaktif tanpa TTY. Install manual: sudo apt install curl netcat"
         exit 1
@@ -101,15 +89,13 @@ check_dependencies() {
     log_ok "Dependency terinstall"
 }
 
-#-------------------------------------------------------------------------------
-# 2. Proxy Validation Function
-#-------------------------------------------------------------------------------
 test_proxy_connection() {
     local test_output
     local exit_code=0
     
+    # Gunakan environment variable, curl otomatis detect
     test_output=$(curl -s --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" \
-        $PROXY_ARGS "$PROXY_TEST_URL" 2>&1) || exit_code=$?
+        "$PROXY_TEST_URL" 2>&1) || exit_code=$?
     
     if [[ $exit_code -eq 0 ]] && echo "$test_output" | grep -q "origin"; then
         local detected_ip
@@ -122,15 +108,13 @@ test_proxy_connection() {
     fi
 }
 
-#-------------------------------------------------------------------------------
-# 3. Proxy Input Function
-#-------------------------------------------------------------------------------
 input_proxy_config() {
-    PROXY_ARGS=""
     PROXY_IP=""
     PROXY_PORT=""
     PROXY_USER=""
     unset PROXY_PASS 2>/dev/null || true
+    unset http_proxy 2>/dev/null || true
+    unset https_proxy 2>/dev/null || true
     
     echo ""
     echo "----------------------------------------------------------"
@@ -145,8 +129,8 @@ input_proxy_config() {
     done
     
     while true; do
-        read -rp "Proxy Port [3128]: " PROXY_PORT < /dev/tty
-        PROXY_PORT=${PROXY_PORT:-3128}
+        read -rp "Proxy Port [8080]: " PROXY_PORT < /dev/tty
+        PROXY_PORT=${PROXY_PORT:-8080}
         if [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ]; then
             break
         fi
@@ -158,28 +142,20 @@ input_proxy_config() {
         read -rsp "Proxy Password: " PROXY_PASS < /dev/tty
         echo ""
         
-        cat > "$NETRC_FILE" <<EOF
-machine $PROXY_IP
-login $PROXY_USER
-password $PROXY_PASS
-EOF
-        chmod 600 "$NETRC_FILE"
-        PROXY_ARGS="--proxy http://$PROXY_IP:$PROXY_PORT --netrc-file $NETRC_FILE"
+        # Buat proxy URL dengan auth
+        export http_proxy="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
+        export https_proxy="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
     else
-        PROXY_ARGS="--proxy http://$PROXY_IP:$PROXY_PORT"
+        export http_proxy="http://$PROXY_IP:$PROXY_PORT"
+        export https_proxy="http://$PROXY_IP:$PROXY_PORT"
     fi
 }
 
-#-------------------------------------------------------------------------------
-# 4. Setup Proxy dengan Retry Loop
-#-------------------------------------------------------------------------------
 setup_proxy() {
     USE_PROXY="n"
-    PROXY_ARGS=""
-    export http_proxy=""
-    export https_proxy=""
+    unset http_proxy 2>/dev/null || true
+    unset https_proxy 2>/dev/null || true
     
-    # Cek apakah bisa akses TTY untuk input (bukan cek stdin)
     if [[ ! -r /dev/tty ]]; then
         log_info "Mode non-interaktif (tidak ada TTY). Skip konfigurasi proxy."
         return 0
@@ -191,6 +167,7 @@ setup_proxy() {
         
         if [[ ! "$use_proxy" =~ ^[Yy]$ ]]; then
             log_info "Mode: Direct Connection"
+            unset http_proxy https_proxy
             return 0
         fi
         
@@ -205,9 +182,6 @@ setup_proxy() {
         if test_result=$(test_proxy_connection); then
             detected_ip="$test_result"
             log_ok "Proxy aktif! (Detected IP: $detected_ip)"
-            
-            export http_proxy="http://$PROXY_IP:$PROXY_PORT"
-            export https_proxy="http://$PROXY_IP:$PROXY_PORT"
             USE_PROXY="y"
             return 0
             
@@ -234,9 +208,7 @@ setup_proxy() {
                     S)
                         log_info "Beralih ke mode Direct Connection"
                         USE_PROXY="n"
-                        PROXY_ARGS=""
-                        export http_proxy=""
-                        export https_proxy=""
+                        unset http_proxy https_proxy
                         return 0
                         ;;
                     C)
@@ -252,9 +224,6 @@ setup_proxy() {
     done
 }
 
-#-------------------------------------------------------------------------------
-# 5. Target Definitions
-#-------------------------------------------------------------------------------
 declare -a TARGETS=(
     "curl:http://update.eset.com"
     "curl:http://eu-update.eset.com"
@@ -278,12 +247,6 @@ declare -a TARGETS=(
     "nc:login.microsoftonline.com:443"
 )
 
-export -f log_info log_ok log_warn log_err
-export USE_PROXY PROXY_ARGS TIMEOUT TEMP_DIR NETRC_FILE
-
-#-------------------------------------------------------------------------------
-# 6. Check Function
-#-------------------------------------------------------------------------------
 check_target() {
     local target="$1"
     local type="${target%%:*}"
@@ -299,10 +262,11 @@ check_target() {
         local port="${address##*:}"
         local method="Netcat"
         
-        if [[ "$USE_PROXY" == "y" ]]; then
+        if [[ "${USE_PROXY:-}" == "y" ]]; then
             method="Proxy-TCP"
+            # Untuk TCP check via proxy, gunakan curl dengan proxy env var
             if curl -s -o /dev/null --connect-timeout "$TIMEOUT" \
-                 --max-time "$TIMEOUT" $PROXY_ARGS \
+                 --max-time "$TIMEOUT" \
                  "https://$host:$port" 2>&1 | grep -q "Connection established\|200\|301\|302"; then
                 status="OK"
             fi
@@ -314,10 +278,11 @@ check_target() {
         address="$host:$port"
     else
         local method="Direct"
-        [[ "$USE_PROXY" == "y" ]] && method="Proxy"
+        [[ "${USE_PROXY:-}" == "y" ]] && method="Proxy"
         
+        # Curl otomatis menggunakan http_proxy/https_proxy env var
         if curl -sf --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" \
-             $PROXY_ARGS "$address" &>/dev/null; then
+             "$address" &>/dev/null; then
             status="OK"
         fi
     fi
@@ -334,14 +299,12 @@ check_target() {
     echo "$status:$duration" > "$TEMP_DIR/result_$(echo "$target" | tr '/:' '_')"
 }
 
-export -f check_target
+export -f check_target log_info log_ok log_warn log_err
+export USE_PROXY TIMEOUT TEMP_DIR
 
-#-------------------------------------------------------------------------------
-# 7. Main Execution
-#-------------------------------------------------------------------------------
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Pipe Fixed)     "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Proxy Fixed)  "
     echo "=========================================================="
     echo ""
     
@@ -379,9 +342,9 @@ main() {
     printf "  \e[32mBerhasil\e[0m     : %d\n" "$total_ok"
     printf "  \e[31mGagal\e[0m        : %d\n" "$total_fail"
     
-    if [[ "$USE_PROXY" == "y" ]]; then
+    if [[ "${USE_PROXY:-}" == "y" ]]; then
         printf "  Mode         : Proxy (%s:%s)\n" "$PROXY_IP" "$PROXY_PORT"
-        [[ -n "$PROXY_USER" ]] && printf "  Auth         : %s (authenticated)\n" "$PROXY_USER"
+        [[ -n "${PROXY_USER:-}" ]] && printf "  Auth         : %s (authenticated)\n" "$PROXY_USER"
     else
         printf "  Mode         : Direct Connection\n"
     fi
