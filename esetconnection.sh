@@ -1,6 +1,6 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker - Optimized with Proxy Retry
+# ESET Connectivity Checker - Fixed Pipe Mode with Proxy Support
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
@@ -8,8 +8,7 @@ IFS=$'\n\t'
 #-------------------------------------------------------------------------------
 # Configuration
 #-------------------------------------------------------------------------------
-readonly SCRIPT_NAME=$(basename "$0")
-readonly SCRIPT_VERSION="2.1"
+readonly SCRIPT_VERSION="2.2"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly PROXY_TEST_URL="http://httpbin.org/ip"
@@ -62,8 +61,9 @@ check_dependencies() {
     
     log_warn "Dependency belum terinstall: ${missing[*]}"
     
-    if [[ ! -t 0 ]]; then
-        log_err "Script dijalankan via pipe. Install manual: sudo apt install curl netcat"
+    # Cek apakah bisa akses TTY untuk konfirmasi
+    if [[ ! -r /dev/tty ]]; then
+        log_err "Mode non-interaktif tanpa TTY. Install manual: sudo apt install curl netcat"
         exit 1
     fi
     
@@ -125,7 +125,6 @@ test_proxy_connection() {
 # 3. Proxy Input Function
 #-------------------------------------------------------------------------------
 input_proxy_config() {
-    # Reset variables
     PROXY_ARGS=""
     PROXY_IP=""
     PROXY_PORT=""
@@ -136,7 +135,6 @@ input_proxy_config() {
     echo "----------------------------------------------------------"
     log_info "Konfigurasi Proxy"
     
-    # Input IP/Hostname
     while true; do
         read -rp "Proxy IP/Hostname: " PROXY_IP < /dev/tty
         if [[ -n "$PROXY_IP" ]]; then
@@ -145,7 +143,6 @@ input_proxy_config() {
         log_warn "IP/Hostname tidak boleh kosong"
     done
     
-    # Input Port
     while true; do
         read -rp "Proxy Port [8080]: " PROXY_PORT < /dev/tty
         PROXY_PORT=${PROXY_PORT:-8080}
@@ -155,13 +152,11 @@ input_proxy_config() {
         log_warn "Port harus angka 1-65535"
     done
     
-    # Input Credential (optional)
     read -rp "Proxy Username (kosongkan jika tidak ada): " PROXY_USER < /dev/tty
     if [[ -n "$PROXY_USER" ]]; then
         read -rsp "Proxy Password: " PROXY_PASS < /dev/tty
-        echo "" # newline
+        echo ""
         
-        # Buat netrc untuk keamanan
         cat > "$NETRC_FILE" <<EOF
 machine $PROXY_IP
 login $PROXY_USER
@@ -183,12 +178,12 @@ setup_proxy() {
     export http_proxy=""
     export https_proxy=""
     
-    if [[ ! -t 0 ]]; then
-        log_info "Mode non-interaktif (pipe). Skip konfigurasi proxy."
+    # Cek apakah bisa akses TTY untuk input (bukan cek stdin)
+    if [[ ! -r /dev/tty ]]; then
+        log_info "Mode non-interaktif (tidak ada TTY). Skip konfigurasi proxy."
         return 0
     fi
     
-    # Loop utama: Tanya apakah pakai proxy
     while true; do
         echo ""
         read -rp "Gunakan proxy? [y/N]: " use_proxy < /dev/tty
@@ -198,10 +193,8 @@ setup_proxy() {
             return 0
         fi
         
-        # Input konfigurasi proxy
         input_proxy_config
         
-        # Test koneksi proxy
         echo ""
         log_info "Menguji koneksi proxy ke $PROXY_IP:$PROXY_PORT..."
         
@@ -212,7 +205,6 @@ setup_proxy() {
             detected_ip="$test_result"
             log_ok "Proxy aktif! (Detected IP: $detected_ip)"
             
-            # Set environment variables
             export http_proxy="http://$PROXY_IP:$PROXY_PORT"
             export https_proxy="http://$PROXY_IP:$PROXY_PORT"
             USE_PROXY="y"
@@ -231,12 +223,12 @@ setup_proxy() {
             
             while true; do
                 read -rp "Pilihan [R/S/C]: " choice < /dev/tty
-                choice=${choice^^} # Uppercase
+                choice=${choice^^}
                 
                 case "$choice" in
                     R)
                         log_info "Mengulang konfigurasi proxy..."
-                        break  # Break inner loop, continue outer loop
+                        break
                         ;;
                     S)
                         log_info "Beralih ke mode Direct Connection"
@@ -255,7 +247,6 @@ setup_proxy() {
                         ;;
                 esac
             done
-            # Continue ke iterasi berikutnya (retry)
         fi
     done
 }
@@ -349,7 +340,7 @@ export -f check_target
 #-------------------------------------------------------------------------------
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Proxy Retry)    "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Pipe Fixed)     "
     echo "=========================================================="
     echo ""
     
@@ -362,12 +353,10 @@ main() {
     
     rm -rf "$TEMP_DIR"/result_* 2>/dev/null || true
     
-    # Parallel execution
     printf "%s\n" "${TARGETS[@]}" | xargs -P "$MAX_PARALLEL" -I {} bash -c 'check_target "{}"'
     
     echo "----------------------------------------------------------"
     
-    # Summary
     local total_ok=0
     local total_fail=0
     
