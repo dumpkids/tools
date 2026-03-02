@@ -69,7 +69,7 @@ check_target() {
     fi
 }
 
-echo "[INFO] Memulai pengecekan ke ${#TARGETS[@]} endpoint ESET..."
+echo "[INFO] Memulai pengecekan ke ${#TARGETS[@]} url ESET..."
 echo "---------------------------------------------------------"
 
 # Mengeksekusi semua pengecekan secara paralel
