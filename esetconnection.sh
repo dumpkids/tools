@@ -98,7 +98,7 @@ test_proxy_connection() {
     
     log_info "Testing koneksi proxy ke update.eset.com:80 ..."
     
-    # Test TCP tunnel ke update.eset.com:80 via proxy
+    # Test TCP tunnel ke download.eset.com:443 via proxy
     test_output=$(curl -v -x "$http_proxy" \
         --connect-timeout "$TIMEOUT" \
         --max-time "$TIMEOUT" \
