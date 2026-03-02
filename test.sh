@@ -1,14 +1,14 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker v2.0 - Optimized Edition
+# ESET Connectivity Checker v2.1 - Optimized Edition (Fixed pipe stdin)
 # Original by: Dumpkids
-# Optimizations: Security, Performance, Code Quality
-# Usage: bash <(curl -sSL https://raw.githubusercontent.com/dumpkids/tools/refs/heads/main/esetconnection-v2.0.sh)
+# Optimizations: Security, Performance, Code Quality, Better TTY handling
+# Usage: bash <(curl -sSL https://raw.githubusercontent.com/dumpkids/tools/refs/heads/main/esetconnection-v2.1.sh)
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="2.0"
+readonly SCRIPT_VERSION="2.1"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly TEMP_DIR=$(mktemp -d)
@@ -31,7 +31,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 #===============================================================================
-# Logging Functions (Optimized with native bash timestamp)
+# Logging Functions
 #===============================================================================
 _get_timestamp() {
     printf '%(%H:%M:%S)T' -1
@@ -54,6 +54,34 @@ log_err() {
 }
 
 #===============================================================================
+# FIX: Better TTY Detection & Input Handling
+#===============================================================================
+_get_input_source() {
+    # Try multiple methods to get a valid input source
+    if [[ -r /dev/tty ]]; then
+        echo "/dev/tty"
+    elif [[ -r /proc/self/fd/0 ]]; then
+        echo "/proc/self/fd/0"
+    else
+        echo "/dev/stdin"
+    fi
+}
+
+_read_input() {
+    local prompt="$1"
+    local varname="$2"
+    local is_password="${3:-false}"
+    local input_source=$(_get_input_source)
+    
+    if [[ "$is_password" == "true" ]]; then
+        read -rsp "$prompt" "$varname" < "$input_source"
+        echo ""
+    else
+        read -rp "$prompt" "$varname" < "$input_source"
+    fi
+}
+
+#===============================================================================
 # Dependency Check
 #===============================================================================
 check_dependencies() {
@@ -73,12 +101,13 @@ check_dependencies() {
 
     log_warn "Dependency belum terinstall: ${missing[*]}"
 
-    if [[ ! -r /dev/tty ]]; then
-        log_err "Mode non-interaktif tanpa TTY. Install manual: sudo apt install curl netcat"
+    local input_source=$(_get_input_source)
+    if [[ ! -r "$input_source" ]]; then
+        log_err "Mode non-interaktif tanpa input. Install manual: sudo apt install curl netcat"
         exit 1
     fi
 
-    read -rp "Install dependency sekarang? [y/N]: " choice < /dev/tty
+    read -rp "Install dependency sekarang? [y/N]: " choice < "$input_source"
     if [[ ! "$choice" =~ ^[Yy]$ ]]; then
         log_err "Dibatalkan oleh user"
         exit 1
@@ -112,7 +141,7 @@ check_dependencies() {
 }
 
 #===============================================================================
-# Proxy Connection Test (Optimized - Single grep with OR pattern)
+# Proxy Connection Test
 #===============================================================================
 test_proxy_connection() {
     local test_output exit_code=0
@@ -124,7 +153,6 @@ test_proxy_connection() {
         --max-time "$TIMEOUT" \
         "telnet://download.eset.com:443" 2>&1) || exit_code=$?
 
-    # IMPROVEMENT #1: Single grep dengan pattern OR
     if echo "$test_output" | grep -q "CONNECT tunnel established\|200 Connection established"; then
         echo "OK"
         return 0
@@ -135,10 +163,9 @@ test_proxy_connection() {
 }
 
 #===============================================================================
-# Proxy Configuration Input
+# Proxy Configuration Input (FIXED: Better input handling)
 #===============================================================================
 input_proxy_config() {
-    # IMPROVEMENT #3: Unified variable reset
     PROXY_IP=""
     PROXY_PORT=""
     PROXY_USER=""
@@ -148,16 +175,18 @@ input_proxy_config() {
     echo "----------------------------------------------------------"
     log_info "Konfigurasi Proxy"
 
+    # Input: Proxy IP/Hostname
     while true; do
-        read -rp "Proxy IP/Hostname: " PROXY_IP < /dev/tty
+        _read_input "Proxy IP/Hostname: " PROXY_IP
         if [[ -n "$PROXY_IP" ]]; then
             break
         fi
         log_warn "IP/Hostname tidak boleh kosong"
     done
 
+    # Input: Proxy Port
     while true; do
-        read -rp "Proxy Port [3128]: " PROXY_PORT < /dev/tty
+        _read_input "Proxy Port [3128]: " PROXY_PORT
         PROXY_PORT=${PROXY_PORT:-3128}
         if [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ]; then
             break
@@ -165,10 +194,11 @@ input_proxy_config() {
         log_warn "Port harus angka 1-65535"
     done
 
-    read -rp "Proxy Username (kosongkan jika tidak ada): " PROXY_USER < /dev/tty
+    # Input: Proxy Username
+    _read_input "Proxy Username (kosongkan jika tidak ada): " PROXY_USER
+    
     if [[ -n "$PROXY_USER" ]]; then
-        read -rsp "Proxy Password: " PROXY_PASS < /dev/tty
-        echo ""
+        _read_input "Proxy Password: " PROXY_PASS "true"
         export http_proxy="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
         export https_proxy="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
     else
@@ -178,20 +208,21 @@ input_proxy_config() {
 }
 
 #===============================================================================
-# Proxy Setup
+# Proxy Setup (FIXED: Better input handling)
 #===============================================================================
 setup_proxy() {
     USE_PROXY="n"
     unset http_proxy https_proxy 2>/dev/null || true
 
-    if [[ ! -r /dev/tty ]]; then
-        log_info "Mode non-interaktif (tidak ada TTY). Skip konfigurasi proxy."
+    local input_source=$(_get_input_source)
+    if [[ ! -r "$input_source" ]]; then
+        log_info "Mode non-interaktif (tidak ada input). Skip konfigurasi proxy."
         return 0
     fi
 
     while true; do
         echo ""
-        read -rp "Gunakan proxy? [y/N]: " use_proxy < /dev/tty
+        _read_input "Gunakan proxy? [y/N]: " use_proxy
 
         if [[ ! "$use_proxy" =~ ^[Yy]$ ]]; then
             log_info "Mode: Direct Connection"
@@ -223,7 +254,7 @@ setup_proxy() {
             echo "----------------------------------------------------------"
 
             while true; do
-                read -rp "Pilihan [R/S/C]: " choice < /dev/tty
+                _read_input "Pilihan [R/S/C]: " choice
                 choice=${choice^^}
 
                 case "$choice" in
@@ -270,7 +301,7 @@ declare -a TARGETS=(
 )
 
 #===============================================================================
-# Target Connectivity Check (Optimized)
+# Target Connectivity Check
 #===============================================================================
 check_target() {
     local target="$1"
@@ -280,7 +311,6 @@ check_target() {
     local start_time end_time duration
     local method=""
 
-    # IMPROVEMENT #2: Validate target format
     if [[ -z "$type" || -z "$address" ]]; then
         log_err "Invalid target format: $target"
         echo "FAIL:0" > "$TEMP_DIR/result_$(echo "$target" | tr '/:' '_')"
@@ -293,7 +323,6 @@ check_target() {
         local host="${address%:*}"
         local port="${address##*:}"
 
-        # IMPROVEMENT #5: Simplified method assignment
         method="Netcat"
         
         if [[ "${USE_PROXY:-}" == "y" ]]; then
@@ -353,12 +382,10 @@ main() {
 
     rm -rf "$TEMP_DIR"/result_* 2>/dev/null || true
 
-    # IMPROVEMENT #7: Optimized parallel execution with proper quoting
     printf "%s\n" "${TARGETS[@]}" | xargs -P "$MAX_PARALLEL" -I {} bash -c 'check_target "$@"' _ {}
 
     echo "----------------------------------------------------------"
 
-    # IMPROVEMENT #9: Faster result file parsing with while loop
     local total_ok=0
     local total_fail=0
 
