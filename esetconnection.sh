@@ -130,8 +130,8 @@ input_proxy_config() {
     done
     
     while true; do
-        read -rp "Proxy Port [8080]: " PROXY_PORT < /dev/tty
-        PROXY_PORT=${PROXY_PORT:-8080}
+        read -rp "Proxy Port [3128]: " PROXY_PORT < /dev/tty
+        PROXY_PORT=${PROXY_PORT:-3128}
         if [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ]; then
             break
         fi
