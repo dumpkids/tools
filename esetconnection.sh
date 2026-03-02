@@ -5,7 +5,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="2.9"
+readonly SCRIPT_VERSION="1.0"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly TEMP_DIR=$(mktemp -d)
