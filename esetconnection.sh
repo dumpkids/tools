@@ -1,11 +1,11 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker v2.8 - Final Proxy Test
+# ESET Connectivity Checker v2.9 - Removed Failed URLs
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
-readonly SCRIPT_VERSION="2.8"
+readonly SCRIPT_VERSION="2.9"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly TEMP_DIR=$(mktemp -d)
@@ -96,13 +96,11 @@ test_proxy_connection() {
     
     log_info "Testing proxy tunnel ke download.eset.com:443 ..."
     
-    # Sama persis command yang berhasil tadi
     test_output=$(curl -v -x "$http_proxy" \
         --connect-timeout "$TIMEOUT" \
         --max-time "$TIMEOUT" \
         "telnet://download.eset.com:443" 2>&1) || exit_code=$?
     
-    # Cek "CONNECT tunnel established, response 200"
     if echo "$test_output" | grep -q "CONNECT tunnel established"; then
         echo "OK"
         return 0
@@ -110,7 +108,6 @@ test_proxy_connection() {
         echo "OK"
         return 0
     else
-        # Ambil error line untuk debug
         echo "$test_output" | grep -E "(Could not connect|Failed to connect|403|407|502|503|timeout)" | tail -1
         return 1
     fi
@@ -228,26 +225,25 @@ setup_proxy() {
     done
 }
 
+# URL yang dihapus:
+# - http://repository.eset.com
+# - http://us-update.eset.com
+# - http://eu-update.eset.com
+# - https://eu.download.protect.eset.com
+# - https://identity.eset.com
+
 declare -a TARGETS=(
-    "curl:http://update.eset.com"
-    "curl:http://eu-update.eset.com"
-    "curl:http://us-update.eset.com"
-    "curl:http://repository.eset.com"
-    "curl:http://pki.eset.com"
-    "curl:http://download.eset.com"
-    "curl:https://eu.download.protect.eset.com"
-    "curl:https://edf.eset.com"
-    "curl:https://iploc.eset.com"
-    "curl:https://protect.eset.com"
-    "curl:https://protecthub.eset.com"
-    "curl:https://identity.eset.com"
+    "nc:update.eset.com:443"
+    "nc:download.eset.com:443"
+    "nc:edf.eset.com:443"
+    "nc:https://iploc.eset.com:43"
     "nc:eu01.server.xdr.eset.systems:443"
     "nc:eu01.agent.edr.eset.systems:8093"
     "nc:epx-k8s-prod-eu-a.westeurope.cloudapp.azure.com:444"
     "nc:epns.eset.com:8883"
     "nc:avcloud.e5.sk:53535"
-    "curl:http://livegrid.eset.systems"
-    "curl:http://augur.scanners.eset.systems"
+    "nc:livegrid.eset.systems:443"
+    "curl:https://augur.scanners.eset.systems"
     "nc:login.microsoftonline.com:443"
 )
 
@@ -268,7 +264,6 @@ check_target() {
         
         if [[ "${USE_PROXY:-}" == "y" ]]; then
             method="Proxy-TCP"
-            # Gunakan curl telnet:// untuk TCP via proxy (sama dengan test tadi)
             if curl -v -x "$http_proxy" \
                      --connect-timeout "$TIMEOUT" \
                      --max-time "$TIMEOUT" \
@@ -309,7 +304,7 @@ export USE_PROXY http_proxy https_proxy TIMEOUT TEMP_DIR
 
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Final)        "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Cleaned)      "
     echo "=========================================================="
     echo ""
     
