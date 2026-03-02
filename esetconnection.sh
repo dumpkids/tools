@@ -226,18 +226,17 @@ setup_proxy() {
 }
 
 # URL yang dihapus:
-# - http://repository.eset.com
 # - http://us-update.eset.com
 # - http://eu-update.eset.com
-# - https://eu.download.protect.eset.com
-# - https://identity.eset.com
 
 declare -a TARGETS=(
     "nc:update.eset.com:443"
+    "nc:repository.eset.com:80"
     "nc:download.eset.com:443"
     "nc:edf.eset.com:443"
     "nc:iploc.eset.com:443"
     "nc:eu01.server.xdr.eset.systems:443"
+    "nc:eu.download.protect.eset.com:443"
     "nc:eu01.agent.edr.eset.systems:8093"
     "nc:epx-k8s-prod-eu-a.westeurope.cloudapp.azure.com:444"
     "nc:epns.eset.com:8883"
