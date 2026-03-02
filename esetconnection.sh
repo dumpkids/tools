@@ -1,12 +1,12 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker v2.4 - Proxy Test via Telnet/NC
+# ESET Connectivity Checker v2.5 - Proxy TCP Fixed
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
 # Configuration
-readonly SCRIPT_VERSION="2.4"
+readonly SCRIPT_VERSION="2.5"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly TEMP_DIR=$(mktemp -d)
@@ -22,6 +22,8 @@ cleanup() {
     rm -rf "$TEMP_DIR" 2>/dev/null || true
     unset PROXY_PASS 2>/dev/null || true
     unset PROXY_USER 2>/dev/null || true
+    unset http_proxy 2>/dev/null || true
+    unset https_proxy 2>/dev/null || true
     wait 2>/dev/null || true
     exit $exit_code
 }
@@ -43,10 +45,6 @@ check_dependencies() {
         missing+=("netcat")
     fi
     
-    if ! command -v telnet &>/dev/null; then
-        missing+=("telnet")
-    fi
-    
     if [[ ${#missing[@]} -eq 0 ]]; then
         return 0
     fi
@@ -54,7 +52,7 @@ check_dependencies() {
     log_warn "Dependency belum terinstall: ${missing[*]}"
     
     if [[ ! -r /dev/tty ]]; then
-        log_err "Mode non-interaktif tanpa TTY. Install manual: sudo apt install curl netcat telnet"
+        log_err "Mode non-interaktif tanpa TTY. Install manual: sudo apt install curl netcat"
         exit 1
     fi
     
@@ -71,19 +69,19 @@ check_dependencies() {
     
     log_info "Menginstall dependency..."
     if command -v apt-get &>/dev/null; then
-        apt-get update -qq && apt-get install -y -qq curl netcat-openbsd telnet
+        apt-get update -qq && apt-get install -y -qq curl netcat-openbsd
     elif command -v dnf &>/dev/null; then
-        dnf install -y -q curl nc telnet
+        dnf install -y -q curl nc
     elif command -v yum &>/dev/null; then
-        yum install -y -q curl nc telnet
+        yum install -y -q curl nc
     elif command -v apk &>/dev/null; then
-        apk add --no-cache curl netcat-openbsd busybox-extras
+        apk add --no-cache curl netcat-openbsd
     else
         log_err "Package manager tidak dikenali. Install manual: ${missing[*]}"
         exit 1
     fi
     
-    if ! command -v curl &>/dev/null || ! command -v nc &>/dev/null || ! command -v telnet &>/dev/null; then
+    if ! command -v curl &>/dev/null || ! command -v nc &>/dev/null; then
         log_err "Instalasi gagal. Periksa koneksi internet."
         exit 1
     fi
@@ -92,31 +90,31 @@ check_dependencies() {
 }
 
 #-------------------------------------------------------------------------------
-# 2. Proxy Validation Function - Telnet Method
+# 2. Proxy Validation Function
 #-------------------------------------------------------------------------------
 test_proxy_connection() {
+    local test_url="http://httpbin.org/ip"
     local test_output
     local exit_code=0
     
-    log_info "Testing TCP connection ke $PROXY_IP:$PROXY_PORT ..."
+    log_info "Testing proxy connectivity..."
     
-    # Gunakan telnet untuk test koneksi TCP
-    # Jika berhasil, akan ada output "Escape character is '^]'"
-    test_output=$(echo "quit" | timeout 5 telnet "$PROXY_IP" "$PROXY_PORT" 2>&1) || exit_code=$?
+    # Test HTTP melalui proxy
+    test_output=$(curl -s -x "$http_proxy" --connect-timeout 5 --max-time 5 "$test_url" 2>&1) || exit_code=$?
     
-    # Cek apakah ada log "Escape character is '^]'" yang menandakan koneksi berhasil
-    if echo "$test_output" | grep -q "Escape character is"; then
-        echo "connected"
+    if [[ $exit_code -eq 0 ]] && echo "$test_output" | grep -q "origin"; then
+        local detected_ip
+        detected_ip=$(echo "$test_output" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+        echo "HTTP_OK:$detected_ip"
         return 0
     else
-        # Jika telnet gagal, coba dengan nc sebagai fallback
-        if nc -vz -w 5 "$PROXY_IP" "$PROXY_PORT" &>/dev/null; then
-            echo "connected"
+        # Coba TCP test ke google:443 sebagai fallback
+        if curl -v -x "$http_proxy" --connect-timeout 5 "telnet://www.google.com:443" 2>&1 | grep -q "200 Connection established"; then
+            echo "TCP_OK"
             return 0
-        else
-            echo "$test_output"
-            return 1
         fi
+        echo "Proxy test failed"
+        return 1
     fi
 }
 
@@ -141,8 +139,8 @@ input_proxy_config() {
     done
     
     while true; do
-        read -rp "Proxy Port [8080]: " PROXY_PORT < /dev/tty
-        PROXY_PORT=${PROXY_PORT:-8080}
+        read -rp "Proxy Port [3128]: " PROXY_PORT < /dev/tty
+        PROXY_PORT=${PROXY_PORT:-3128}
         if [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ]; then
             break
         fi
@@ -153,7 +151,6 @@ input_proxy_config() {
     if [[ -n "$PROXY_USER" ]]; then
         read -rsp "Proxy Password: " PROXY_PASS < /dev/tty
         echo ""
-        
         export http_proxy="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
         export https_proxy="http://$PROXY_USER:$PROXY_PASS@$PROXY_IP:$PROXY_PORT"
     else
@@ -186,11 +183,18 @@ setup_proxy() {
         
         echo ""
         local test_result
-        local detected_status=""
+        local test_status=""
+        local detected_ip=""
         
         if test_result=$(test_proxy_connection); then
-            detected_status="$test_result"
-            log_ok "Proxy terkoneksi! (Status: $detected_status)"
+            test_status="${test_result%%:*}"
+            detected_ip="${test_result##*:}"
+            
+            if [[ "$test_status" == "HTTP_OK" ]]; then
+                log_ok "Proxy aktif! (Detected IP: $detected_ip)"
+            else
+                log_ok "Proxy TCP tunnel aktif!"
+            fi
             USE_PROXY="y"
             return 0
             
@@ -273,12 +277,17 @@ check_target() {
         
         if [[ "${USE_PROXY:-}" == "y" ]]; then
             method="Proxy-TCP"
-            if curl -s -o /dev/null --connect-timeout "$TIMEOUT" \
-                 --max-time "$TIMEOUT" \
-                 "https://$host:$port" 2>&1 | grep -q "Connection established\|200\|301\|302"; then
+            # Gunakan curl dengan telnet:// untuk TCP check via proxy (CONNECT method)
+            # Cek "200 Connection established" atau "CONNECT tunnel established"
+            if curl -v -x "$http_proxy" \
+                     --connect-timeout "$TIMEOUT" \
+                     --max-time "$TIMEOUT" \
+                     "telnet://$host:$port" 2>&1 | \
+                     grep -q "200 Connection established\|CONNECT tunnel established"; then
                 status="OK"
             fi
         else
+            method="Netcat"
             if nc -vz -w "$TIMEOUT" "$host" "$port" &>/dev/null; then
                 status="OK"
             fi
@@ -288,8 +297,8 @@ check_target() {
         local method="Direct"
         [[ "${USE_PROXY:-}" == "y" ]] && method="Proxy"
         
-        if curl -sf --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" \
-             "$address" &>/dev/null; then
+        # Curl otomatis gunakan http_proxy/https_proxy env var
+        if curl -sf --connect-timeout "$TIMEOUT" --max-time "$TIMEOUT" "$address" &>/dev/null; then
             status="OK"
         fi
     fi
@@ -307,11 +316,11 @@ check_target() {
 }
 
 export -f check_target log_info log_ok log_warn log_err
-export USE_PROXY TIMEOUT TEMP_DIR
+export USE_PROXY http_proxy https_proxy TIMEOUT TEMP_DIR
 
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Proxy Telnet) "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (TCP Proxy)    "
     echo "=========================================================="
     echo ""
     
