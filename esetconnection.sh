@@ -1,6 +1,6 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker v1.0 - Removed Failed URLs
+# ESET Connectivity Checker v1.0 - Connection Test by Dump
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
