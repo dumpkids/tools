@@ -236,7 +236,7 @@ declare -a TARGETS=(
     "nc:update.eset.com:443"
     "nc:download.eset.com:443"
     "nc:edf.eset.com:443"
-    "nc:https://iploc.eset.com:43"
+    "nc:https://iploc.eset.com:443"
     "nc:eu01.server.xdr.eset.systems:443"
     "nc:eu01.agent.edr.eset.systems:8093"
     "nc:epx-k8s-prod-eu-a.westeurope.cloudapp.azure.com:444"
@@ -244,7 +244,6 @@ declare -a TARGETS=(
     "nc:avcloud.e5.sk:53535"
     "nc:livegrid.eset.systems:443"
     "curl:https://augur.scanners.eset.systems"
-    "nc:login.microsoftonline.com:443"
 )
 
 check_target() {
