@@ -303,7 +303,7 @@ export USE_PROXY http_proxy https_proxy TIMEOUT TEMP_DIR
 
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Cleaned)      "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (By Dumpkids)      "
     echo "=========================================================="
     echo ""
 
