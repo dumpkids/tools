@@ -11,7 +11,8 @@ IFS=$'\n\t'
 readonly SCRIPT_VERSION="2.2"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
-readonly PROXY_TEST_URL="http://httpbin.org/ip"
+readonly PROXY_TEST_URL="https://eset.com/"
+## bisa pake http://httpbin.org/ip
 readonly TEMP_DIR=$(mktemp -d)
 readonly NETRC_FILE="$TEMP_DIR/.netrc"
 
@@ -144,8 +145,8 @@ input_proxy_config() {
     done
     
     while true; do
-        read -rp "Proxy Port [8080]: " PROXY_PORT < /dev/tty
-        PROXY_PORT=${PROXY_PORT:-8080}
+        read -rp "Proxy Port [3128]: " PROXY_PORT < /dev/tty
+        PROXY_PORT=${PROXY_PORT:-3128}
         if [[ "$PROXY_PORT" =~ ^[0-9]+$ ]] && [ "$PROXY_PORT" -ge 1 ] && [ "$PROXY_PORT" -le 65535 ]; then
             break
         fi
