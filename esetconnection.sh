@@ -61,7 +61,7 @@ check_target() {
     else
         # Mode cURL untuk cek URL HTTP/HTTPS
         # -m 5 berarti timeout 5 detik, -s untuk silent, -f untuk fail on error
-        if curl -s -m 5 -f -v "$target" &> /dev/null; then
+        if curl -s -m 5 "$target" &> /dev/null; then
             printf "[\e[32m  OK  \e[0m] %-55s (via cURL)\n" "$target"
         else
             printf "[\e[31m FAIL \e[0m] %-55s (via cURL)\n" "$target"
