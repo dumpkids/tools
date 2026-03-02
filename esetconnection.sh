@@ -1,17 +1,15 @@
 #!/bin/bash
 #===============================================================================
-# ESET Connectivity Checker v2.7 - Test Proxy ke ESET
+# ESET Connectivity Checker v2.8 - Final Proxy Test
 #===============================================================================
 set -euo pipefail
 IFS=$'\n\t'
 
-# Configuration
-readonly SCRIPT_VERSION="2.7"
+readonly SCRIPT_VERSION="2.8"
 readonly MAX_PARALLEL=8
 readonly TIMEOUT=10
 readonly TEMP_DIR=$(mktemp -d)
 
-# Global State
 USE_PROXY="n"
 PROXY_IP=""
 PROXY_PORT=""
@@ -90,27 +88,30 @@ check_dependencies() {
 }
 
 #-------------------------------------------------------------------------------
-# 2. Proxy Validation Function - Test ke ESET.com
+# 2. Proxy Validation - Test ke download.eset.com:443
 #-------------------------------------------------------------------------------
 test_proxy_connection() {
     local test_output
     local exit_code=0
     
-    log_info "Testing koneksi proxy ke update.eset.com:80 ..."
+    log_info "Testing proxy tunnel ke download.eset.com:443 ..."
     
-    # Test TCP tunnel ke download.eset.com:443 via proxy
+    # Sama persis command yang berhasil tadi
     test_output=$(curl -v -x "$http_proxy" \
         --connect-timeout "$TIMEOUT" \
         --max-time "$TIMEOUT" \
-        "telnet://update.eset.com:80" 2>&1) || exit_code=$?
+        "telnet://download.eset.com:443" 2>&1) || exit_code=$?
     
-    # Cek apakah tunnel berhasil dibuat
-    if echo "$test_output" | grep -q "CONNECT tunnel established\|200 Connection established"; then
-        echo "TCP_OK"
+    # Cek "CONNECT tunnel established, response 200"
+    if echo "$test_output" | grep -q "CONNECT tunnel established"; then
+        echo "OK"
+        return 0
+    elif echo "$test_output" | grep -q "200 Connection established"; then
+        echo "OK"
         return 0
     else
-        # Tampilkan error untuk debugging
-        echo "$test_output" | grep -E "(Could not connect|Failed to connect|403|407|502|503)" | tail -3
+        # Ambil error line untuk debug
+        echo "$test_output" | grep -E "(Could not connect|Failed to connect|403|407|502|503|timeout)" | tail -1
         return 1
     fi
 }
@@ -182,8 +183,8 @@ setup_proxy() {
         local test_result
         
         if test_result=$(test_proxy_connection); then
-            if [[ "$test_result" == "TCP_OK" ]]; then
-                log_ok "Proxy aktif! Tunnel ke update.eset.com berhasil."
+            if [[ "$test_result" == "OK" ]]; then
+                log_ok "Proxy tunnel aktif! (download.eset.com:443)"
             fi
             USE_PROXY="y"
             return 0
@@ -267,6 +268,7 @@ check_target() {
         
         if [[ "${USE_PROXY:-}" == "y" ]]; then
             method="Proxy-TCP"
+            # Gunakan curl telnet:// untuk TCP via proxy (sama dengan test tadi)
             if curl -v -x "$http_proxy" \
                      --connect-timeout "$TIMEOUT" \
                      --max-time "$TIMEOUT" \
@@ -307,7 +309,7 @@ export USE_PROXY http_proxy https_proxy TIMEOUT TEMP_DIR
 
 main() {
     echo "=========================================================="
-    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (ESET Test)    "
+    echo " ESET Connectivity Checker v${SCRIPT_VERSION} (Final)        "
     echo "=========================================================="
     echo ""
     
