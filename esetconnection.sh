@@ -244,7 +244,6 @@ declare -a TARGETS=(
     "nc:avcloud.e5.sk:53535"
     "nc:livegrid.eset.systems:443"
     "curl:https://augur.scanners.eset.systems"
-    "nc:login.microsoftonline.com:443"
 )
 
 check_target() {
