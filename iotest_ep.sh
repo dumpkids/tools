@@ -1,0 +1,1 @@
+fio --name=eset_production_real --filename=/var/lib/mysql/testfile.dat --size=1000M --bs=4k --runtime=120 --time_based --direct=1 --rw=randrw --rwmixwrite=50 --randrepeat=0 --refill_buffers --ioengine=libaio --iodepth=1 --output=eset_realworld_result.txt
