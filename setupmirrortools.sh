@@ -66,7 +66,6 @@ find "$LOG_DIR" -name "update_*.log" -type f -mtime +30 -delete
 
 OUTPUT_DIR="${MIRRORTOOL_DIR}/dir"
 EP9_PARENT="${OUTPUT_DIR}/eset_upd"
-EP9_DIR="${EP9_PARENT}/ep9"
 DOWNLOAD_DIR="${MIRRORTOOL_DIR}/dir/download/"
 
 # Eksekusi Mirror Tool
@@ -78,8 +77,8 @@ DOWNLOAD_DIR="${MIRRORTOOL_DIR}/dir/download/"
   --excludedProducts ep6 ep7 ep8 ep10 ep11 ep12 ep13 era6 \
   --useSecureConnection
 
-if [[ ! -d "$EP9_DIR" ]]; then
-  echo "🚨 ERROR: Folder ep9 tidak ditemukan!" >&2
+if [[ ! -d "${OUTPUT_DIR}/eset_upd" ]]; then
+  echo "🚨 ERROR: Folder eset_upd tidak ditemukan setelah update!" >&2
   exit 1
 fi
 
