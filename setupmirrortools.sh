@@ -23,7 +23,6 @@ main() {
     mkdir -p "${MIRRORTOOL_DIR}/temp"
     mkdir -p "${MIRRORTOOL_DIR}/dir"
     mkdir -p "${MIRRORTOOL_DIR}/dir/download"
-    mkdir -p "${MIRRORTOOL_DIR}/ep9"
 
     # Alihkan output ke file log sekaligus tampil di layar
     exec > >(tee -a "$SETUP_LOG") 2>&1
