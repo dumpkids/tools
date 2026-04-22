@@ -28,7 +28,7 @@ main() {
     exec > >(tee -a "$SETUP_LOG") 2>&1
 
     echo "==================================================="
-    echo "🚀 Memulai Setup ESET Mirror Tool Enterprise..."
+    echo "🚀 Memulai Setup ESET Mirror Tool Win 7 ONLY"
     echo "==================================================="
 
     # --- 3. Install Dependensi ---
@@ -116,6 +116,7 @@ EOF
     echo ""
     echo "⚠️  LANGKAH TERAKHIR (WAJIB) ⚠️"
     echo "Upload file lisensi offline Anda ke server ini di lokasi:"
+    echo "Cara GENERATE OFFLINE LISENSI https://help.eset.com/protect_hub/customer/en-US/create_offline_license_file.html"
     echo "👉 /opt/mirrortool/offlinelicensemirrortools.lf"
     echo "==================================================="
 }
