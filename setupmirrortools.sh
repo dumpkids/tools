@@ -22,7 +22,7 @@ main() {
     mkdir -p "$LOG_DIR"
     mkdir -p "${MIRRORTOOL_DIR}/temp"
     mkdir -p "${MIRRORTOOL_DIR}/dir"
-    mkdir -p "${MIRRORTOOL_DIR}/download"
+    mkdir -p "${MIRRORTOOL_DIR}/dir/download"
     mkdir -p "${MIRRORTOOL_DIR}/ep9"
 
     # Alihkan output ke file log sekaligus tampil di layar
@@ -68,7 +68,7 @@ find "$LOG_DIR" -name "update_*.log" -type f -mtime +30 -delete
 OUTPUT_DIR="${MIRRORTOOL_DIR}/dir"
 EP9_PARENT="${OUTPUT_DIR}/eset_upd"
 EP9_DIR="${EP9_PARENT}/ep9"
-DOWNLOAD_DIR="${MIRRORTOOL_DIR}/download"
+DOWNLOAD_DIR="${MIRRORTOOL_DIR}/dir/download/"
 
 # Eksekusi Mirror Tool
 "${MIRRORTOOL_DIR}/MirrorTool" \
