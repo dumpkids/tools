@@ -240,6 +240,7 @@ declare -a TARGETS=(
     "nc:eu01.agent.edr.eset.systems:8093"
     "nc:epx-k8s-prod-eu-a.westeurope.cloudapp.azure.com:444"
     "nc:epns.eset.com:8883"
+    "nc:eu.mdm.eset.com:443"
     "nc:avcloud.e5.sk:53535"
     "nc:livegrid.eset.systems:443"
     "curl:https://augur.scanners.eset.systems"
