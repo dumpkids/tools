@@ -1,0 +1,5 @@
+curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xB7B3B788A8D3785C" -o /tmp/RPM-GPG-KEY-mysql-2023
+
+sudo gpg --dearmor < /tmp/RPM-GPG-KEY-mysql-2023 | sudo tee /usr/share/keyrings/mysql-apt-config.gpg >/dev/null
+
+rm /tmp/RPM-GPG-KEY-mysql-2023
