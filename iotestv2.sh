@@ -12,7 +12,16 @@ TEST_SIZE_BYTES=$((TEST_SIZE_MIB * 1024 * 1024))
 TEST_RUNTIME=120
 MIN_FREE_PERCENT_AFTER_TEST=10
 
-SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_SOURCE="${BASH_SOURCE[0]:-}"
+if [[ -n "$SCRIPT_SOURCE" && -f "$SCRIPT_SOURCE" ]]; then
+    SCRIPT_PATH="$(readlink -f -- "$SCRIPT_SOURCE")"
+    SCRIPT_DIR="$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)"
+else
+    # When invoked through `curl ... | sudo bash`, there is no script file.
+    # Save the result in the directory from which the pipeline was run.
+    SCRIPT_PATH=""
+    SCRIPT_DIR="$PWD"
+fi
 TIMESTAMP="$(date '+%Y%m%d-%H%M%S')"
 RESULT_FILE="${SCRIPT_DIR}/eset-fio-result-${TIMESTAMP}.txt"
 
@@ -111,6 +120,19 @@ odbc_value() {
     return 1
 }
 
+odbc_value_any() {
+    local key value
+
+    for key in "$@"; do
+        if value="$(odbc_value "$key")"; then
+            printf '%s' "$value"
+            return 0
+        fi
+    done
+
+    return 1
+}
+
 # Decode an ODBC braced value and ESET-style backslash escapes.
 # Examples: {p@ss;word} -> p@ss;word, {\@secret} -> @secret,
 # and {one\\two} -> one\two. No eval is used.
@@ -168,7 +190,10 @@ find_real_fio() {
 
 if (( EUID != 0 )); then
     log "Skrip memerlukan akses root untuk membaca konfigurasi ESET dan menguji storage database."
-    exec sudo -- "$0" "$@"
+    if [[ -n "$SCRIPT_PATH" ]]; then
+        exec sudo -- "$SCRIPT_PATH" "$@"
+    fi
+    die "Untuk eksekusi melalui pipeline, gunakan: curl ... | sudo bash"
 fi
 
 [[ -r "$CONFIG_FILE" ]] || die "Konfigurasi ESET tidak dapat dibaca: $CONFIG_FILE"
@@ -227,11 +252,11 @@ DB_CONNECTION_STRING="$(awk '
 [[ "${DB_TYPE,,}" == *mysql* || "${DB_TYPE,,}" == *maria* ]] || \
     die "DatabaseType bukan MySQL/MariaDB: ${DB_TYPE:-tidak diketahui}"
 
-DB_HOST="$(decode_odbc_value "$(odbc_value Server || true)")"
-DB_PORT="$(decode_odbc_value "$(odbc_value Port || true)")"
-DB_NAME="$(decode_odbc_value "$(odbc_value Database || true)")"
-DB_USER="$(decode_odbc_value "$(odbc_value Uid || true)")"
-DB_PASS="$(decode_odbc_value "$(odbc_value Pwd || true)")"
+DB_HOST="$(decode_odbc_value "$(odbc_value_any Server Host || true)")"
+DB_PORT="$(decode_odbc_value "$(odbc_value_any Port || true)")"
+DB_NAME="$(decode_odbc_value "$(odbc_value_any Database DB || true)")"
+DB_USER="$(decode_odbc_value "$(odbc_value_any Uid User 'User ID' Username || true)")"
+DB_PASS="$(decode_odbc_value "$(odbc_value_any Pwd Password || true)")"
 
 DB_HOST="${DB_HOST:-127.0.0.1}"
 DB_PORT="${DB_PORT:-3306}"
