@@ -300,7 +300,7 @@ DB_DATADIR="$(readlink -f -- "$DB_DATADIR")"
 TEST_FILE="${DB_DATADIR%/}/eset-fio-test.dat"
 [[ ! -e "$TEST_FILE" ]] || die "File tes sudah ada dan tidak akan ditimpa: $TEST_FILE"
 
-read -r FS_TOTAL FS_AVAILABLE < <(df -PB1 --output=size,avail "$DB_DATADIR" | awk 'NR == 2 {print $1, $2}')
+read -r FS_TOTAL FS_AVAILABLE < <(df -B1 --output=size,avail "$DB_DATADIR" | awk 'NR == 2 {print $1, $2}')
 [[ "$FS_TOTAL" =~ ^[0-9]+$ && "$FS_AVAILABLE" =~ ^[0-9]+$ ]] || \
     die "Tidak dapat membaca kapasitas filesystem database."
 
